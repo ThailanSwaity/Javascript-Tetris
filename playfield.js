@@ -80,6 +80,12 @@ class Tetrimino {
     this.blocks = this.copyArrayConst(array);
   }
 
+  getGhost() {
+    var ghost = new Tetrimino(this.x, this.y, this.type, this.rotation, this.colour);
+    ghost.blocks = this.blocks;
+    return ghost;
+  }
+
   copyArrayConst(array) {
     var arr = [];
     for (var i = 0; i < array.length; i++) {
@@ -150,6 +156,7 @@ class PlayField {
 
     // A "bag" of 7 uniqte tetriminoes 
     this.bag = new Bag();
+    this.ghost = {};
 
     this.pf.addEventListener('keyup', (event) => {
       this.btnPressed[event.code] = false;
@@ -176,7 +183,23 @@ class PlayField {
   spawn() {
     let next = this.bag.next();
     var tetrimino = new Tetrimino(5, 1, next, 0, TETR_CLRS[next]);
+    this.ghost = tetrimino.getGhost();
     this.cntrlPiece = tetrimino;
+  }
+
+  placeGhost() {
+    this.ghost.x = this.cntrlPiece.x;
+    this.ghost.y = this.cntrlPiece.y;
+    var tet = this.ghost.getLocations();
+    var hitBlock = false;
+    do {
+      for (var i = 0; i < tet.length; i++) {
+        if (tet[i][1] < 0) continue;
+        if (this.isBlock(tet[i][0], tet[i][1] + 1)) hitBlock = true;
+      }
+      if (!hitBlock) this.ghost.y++;
+      tet = this.ghost.getLocations();
+    } while (!hitBlock);
   }
 
   isBlock(x, y) {
@@ -218,10 +241,10 @@ class PlayField {
     var travelDir = -1;
     var rot = -1;
 
-    if (this.registerKey("KeyA")) {
+    if (this.registerKey("KeyA", 5)) {
       this.cntrlPiece.x--;
       travelDir = 0;
-    } else if (this.registerKey("KeyD")) {
+    } else if (this.registerKey("KeyD", 5)) {
       this.cntrlPiece.x++;
       travelDir = 2;
     } else if (this.registerKey("KeyS")) {
@@ -235,15 +258,20 @@ class PlayField {
     } else if (this.registerKey("Comma") && this.cntrlPiece.type != TETR_O) {
       this.cntrlPiece.cRotate();
       rot = 0;
+    } else if (this.registerKey("Space", 55)) {
+      this.cntrlPiece.y = this.ghost.y;
+      this.placePiece();
     }
 
     this.adjustCntrlPiece(travelDir, rot);
+    this.placeGhost();
   }
 
-  registerKey(key) {
+  registerKey(key, cooldown) {
+    if (!cooldown) cooldown = this.btnCooldown;
 
     if (this.btnPressed[key]) {
-      if (this.btnPressTimer[key] % this.btnCooldown == 0) {
+      if (this.btnPressTimer[key] % cooldown == 0) {
         this.btnPressTimer[key]++;
         return true;
       }
@@ -296,6 +324,7 @@ class PlayField {
     }
     this.spawn();
     this.clearLines();
+    console.log(this.bag.bag);
   }
 
   intToCoords(i) {
@@ -361,7 +390,21 @@ class PlayField {
     this.ctx.stroke();
   
     if ('blocks' in this.cntrlPiece) {
-      var tet = this.cntrlPiece.getLocations();
+
+      var tet = this.ghost.getLocations();
+      for (var i = 0; i < tet.length; i++) {
+        this.ctx.fillStyle = "#F8F8F8";
+        this.ctx.fillRect(tet[i][0] * this.blkWidth, tet[i][1] * this.blkHeight, this.blkWidth, this.blkHeight);
+      }
+
+      // draw the ghost piece
+      for (var i = 0; i < tet.length; i++) {
+        this.ctx.beginPath();
+        this.ctx.rect(tet[i][0] * this.blkWidth, tet[i][1] * this.blkHeight, this.blkWidth, this.blkHeight);
+        this.ctx.stroke();
+      }
+
+      tet = this.cntrlPiece.getLocations();
       for (var i = 0; i < tet.length; i++) {
         this.ctx.fillStyle = this.cntrlPiece.colour;
         this.ctx.fillRect(tet[i][0] * this.blkWidth, tet[i][1] * this.blkHeight, this.blkWidth, this.blkHeight);
@@ -374,7 +417,7 @@ class PlayField {
       }   
 
     }
- 
+
   }
 
 }
