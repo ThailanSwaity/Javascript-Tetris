@@ -18,8 +18,8 @@ const TETR_BZ = 6;
 
 const NUM_TETRIMINOS = 7;
 
-const ccRot = [0, -1, 1, 0];
-const cRot = [0, 1, -1, 0];
+const CCROT = [0, -1, 1, 0];
+const CROT = [0, 1, -1, 0];
 
 const DEFAULT_BGCL = "#F0F0F0";
 
@@ -31,7 +31,7 @@ class Tetrimino {
     this.rotation = rotation;
     this.type = type;
     this.blocks = [];
-    this.init();
+    this.init();      
   }
 
   init() {
@@ -56,16 +56,12 @@ class Tetrimino {
     return arr;
   }
 
-  update() {
-    this.y++;
-  }
-
   ccRotate() {
     for (var i = 0; i < this.blocks.length; i++) {
       let x = this.blocks[i][0];
       let y = this.blocks[i][1];
-      let xp = ccRot[0] * x + ccRot[1] * y;
-      let yp = ccRot[2] * x + ccRot[3] * y;
+      let xp = CCROT[0] * x + CCROT[1] * y;
+      let yp = CCROT[2] * x + CCROT[3] * y;
       this.blocks[i][0] = xp;
       this.blocks[i][1] = yp;  
     }
@@ -75,16 +71,14 @@ class Tetrimino {
     for (var i = 0; i < this.blocks.length; i++) {
       let x = this.blocks[i][0];
       let y = this.blocks[i][1];
-      let xp = cRot[0] * x + cRot[1] * y;
-      let yp = cRot[2] * x + cRot[3] * y;
+      let xp = CROT[0] * x + CROT[1] * y;
+      let yp = CROT[2] * x + CROT[3] * y;
       this.blocks[i][0] = xp;
       this.blocks[i][1] = yp;  
     }
   }
 
   getLocations() {
-    // Transform the TETR_T block locations using the x,y and rotation values
-    // TODO implement rotations
     var blocks = [];
 
     // Deep copy the original arry
@@ -107,10 +101,14 @@ class PlayField {
 
     // Controls game speed
     this.dropSpeed = 15;
-    this.dropCounter = 0;
+    this.dropSpeedCounter = 0;
 
     // Controls the speed of registered key events
     this.keySpeed = 50;
+
+    // Time given to move a piece when it is on top of another
+    this.dropTime = 15;
+    this.dropTimeCounter = 0;
 
     this.init();
     this.keys = {};
@@ -166,6 +164,7 @@ class PlayField {
         }
         else if (travelDir == 0) xCollision = -1;
         else if (travelDir == 2) xCollision = 1;  
+        else yCollision = 1;
       }
       this.cntrlPiece.x -= xCollision;
       this.cntrlPiece.y -= yCollision;
@@ -184,6 +183,12 @@ class PlayField {
     else if (code == "KeyD") {
       this.cntrlPiece.x++;
       travelDir = 2;
+    }
+    else if (code == "KeyS") {
+      this.cntrlPiece.y++;
+      this.adjustCntrlPiece();
+      this.checkPlacement(3);
+      return;
     }
     else if (code == "Period" && this.cntrlPiece.type != TETR_O) {
       this.cntrlPiece.ccRotate();
@@ -252,29 +257,33 @@ class PlayField {
     return y * this.width + x;
   }
 
-  checkPlacement() {
+  checkPlacement(travelDir) {
     var tet = this.cntrlPiece.getLocations();
     for (var i = 0; i < tet.length; i++) {
       let x = tet[i][0];
       let y = tet[i][1];
       if (tet[i][1] == this.height - 1 || this.isBlock(x, y + 1)) {
-        this.placePiece();
+        if (this.dropTimeCounter >= this.dropTime || travelDir == 3) {
+          this.placePiece();
+          this.dropTimeCounter = 0;
+        }
+        else this.dropTimeCounter++;
         return;
       }
     }
   }
 
   update() {
-    this.dropCounter++;
-    if (this.dropCounter >= this.dropSpeed) {
+    this.dropSpeedCounter++;
+    if (this.dropSpeedCounter >= this.dropSpeed) {
       if ('blocks' in this.cntrlPiece) {
-        this.cntrlPiece.update();
+        this.cntrlPiece.y++;
         this.adjustCntrlPiece();
         this.checkPlacement();
       } else {
         this.spawn();
       }
-      this.dropCounter = 0;
+      this.dropSpeedCounter = 0;
     }
   }
 
