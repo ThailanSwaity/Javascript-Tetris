@@ -23,6 +23,37 @@ const CROT = [0, 1, -1, 0];
 
 const DEFAULT_BGCL = "#F0F0F0";
 
+class Bag {
+  constructor() {
+    this.bag = [];
+    this.bagsize = 7;
+    this.generate();
+  }
+
+  inBag(num) {
+    for (var i = 0; i < this.bag.length; i++) {
+      if (this.bag[i] == num) return true;
+    }
+    return false;
+  }
+
+  next() {
+    let n = this.bag.pop();
+    if (this.bag.length == 0) this.generate();
+    return n;
+  }
+
+  generate() {
+    for (var i = 0; i < this.bagsize; i++) {
+      var randNum;
+      do {
+        randNum = Math.floor(Math.random() * NUM_TETRIMINOS);
+      } while (this.inBag(randNum));
+      this.bag.push(randNum);
+    }
+  }
+}
+
 class Tetrimino {
   constructor(x, y, type, rotation, colour) {
     this.x = x;
@@ -31,6 +62,7 @@ class Tetrimino {
     this.rotation = rotation;
     this.type = type;
     this.blocks = [];
+
     this.init();      
   }
 
@@ -100,21 +132,31 @@ class PlayField {
     this.pf = document.getElementById(id);
 
     // Controls game speed
-    this.dropSpeed = 15;
+    this.dropSpeed = 90;
     this.dropSpeedCounter = 0;
 
     // Controls the speed of registered key events
     this.keySpeed = 50;
 
     // Time given to move a piece when it is on top of another
-    this.dropTime = 15;
+    this.dropTime = 7;
     this.dropTimeCounter = 0;
 
     this.init();
-    this.keys = {};
+
+    this.btnPressed = [];
+    this.btnPressTimer = [];
+    this.btnCooldown = 8;
+
+    // A "bag" of 7 uniqte tetriminoes 
+    this.bag = new Bag();
+
+    this.pf.addEventListener('keyup', (event) => {
+      this.btnPressed[event.code] = false;
+    });
 
     this.pf.addEventListener('keydown', (event) => {
-      this.handleKeys(event.code);
+      this.btnPressed[event.code] = true;
     });
   }
 
@@ -132,9 +174,8 @@ class PlayField {
   } 
 
   spawn() {
-    let rand = Math.floor(Math.random() * NUM_TETRIMINOS);
-
-    var tetrimino = new Tetrimino(5, 1, rand, 0, TETR_CLRS[rand]);
+    let next = this.bag.next();
+    var tetrimino = new Tetrimino(5, 1, next, 0, TETR_CLRS[next]);
     this.cntrlPiece = tetrimino;
   }
 
@@ -173,33 +214,44 @@ class PlayField {
 
   }
 
-  handleKeys(code) {
+  handleKeys() {
     var travelDir = -1;
     var rot = -1;
-    if (code == "KeyA") {
+
+    if (this.registerKey("KeyA")) {
       this.cntrlPiece.x--;
       travelDir = 0;
-    }
-    else if (code == "KeyD") {
+    } else if (this.registerKey("KeyD")) {
       this.cntrlPiece.x++;
       travelDir = 2;
-    }
-    else if (code == "KeyS") {
+    } else if (this.registerKey("KeyS")) {
       this.cntrlPiece.y++;
       this.adjustCntrlPiece();
       this.checkPlacement(3);
       return;
-    }
-    else if (code == "Period" && this.cntrlPiece.type != TETR_O) {
+    } else if (this.registerKey("Period") && this.cntrlPiece.type != TETR_O) {
       this.cntrlPiece.ccRotate();
       rot = 0;
-    }
-    else if (code == "Comma" && this.cntrlPiece.type != TETR_O) {
+    } else if (this.registerKey("Comma") && this.cntrlPiece.type != TETR_O) {
       this.cntrlPiece.cRotate();
-      rot = 1;
+      rot = 0;
     }
 
     this.adjustCntrlPiece(travelDir, rot);
+  }
+
+  registerKey(key) {
+
+    if (this.btnPressed[key]) {
+      if (this.btnPressTimer[key] % this.btnCooldown == 0) {
+        this.btnPressTimer[key]++;
+        return true;
+      }
+      this.btnPressTimer[key]++;
+    } else {
+      this.btnPressTimer[key] = 0;
+    }
+    return false;
   }
 
   /*
@@ -275,6 +327,7 @@ class PlayField {
 
   update() {
     this.dropSpeedCounter++;
+    this.handleKeys();
     if (this.dropSpeedCounter >= this.dropSpeed) {
       if ('blocks' in this.cntrlPiece) {
         this.cntrlPiece.y++;
@@ -295,6 +348,12 @@ class PlayField {
       // Draw the grid block colours
       this.ctx.fillStyle = this.blocks[i];
       this.ctx.fillRect(x * this.blkWidth, y * this.blkHeight, this.blkWidth, this.blkHeight);
+
+      if (this.isBlock(x, y)) {
+        this.ctx.beginPath();
+        this.ctx.rect(x * this.blkWidth, y * this.blkHeight, this.blkWidth, this.blkHeight);
+        this.ctx.stroke();
+      }
     }
     
     this.ctx.beginPath();
