@@ -1,6 +1,6 @@
-const ARR_TETR_T = [[-1, 0], [0, 0], [1, 0], [0, 1]];
+const ARR_TETR_T = [[-1, 0], [0, 0], [1, 0], [0, -1]];
 const ARR_TETR_L = [[-1, 0], [0, 0], [1, 0], [1, -1]];
-const ARR_TETR_BL = [[-1, 0], [0, 0], [1, 0], [1, 1]];
+const ARR_TETR_BL = [[-1, 0], [0, 0], [1, 0], [-1, -1]];
 const ARR_TETR_O = [[0, 0], [1, 0], [0, 1], [1, 1]];
 const ARR_TETR_I = [[-1, 0], [0, 0], [1, 0], [2, 0]];
 const ARR_TETR_Z = [[-1, 0], [0, 0], [0, 1], [1, 1]];
@@ -41,6 +41,10 @@ class Bag {
     let n = this.bag.pop();
     if (this.bag.length == 0) this.generate();
     return n;
+  }
+
+  preview() {
+    return this.bag[this.bag.length - 1];
   }
 
   generate() {
@@ -135,7 +139,6 @@ class Tetrimino {
 class PlayField {
   constructor(id) {
     this.id = id;
-    this.pf = document.getElementById(id);
 
     // Controls game speed
     this.dropSpeed = 90;
@@ -145,7 +148,7 @@ class PlayField {
     this.keySpeed = 50;
 
     // Time given to move a piece when it is on top of another
-    this.dropTime = 7;
+    this.dropTime = 2;
     this.dropTimeCounter = 0;
 
     this.init();
@@ -158,6 +161,8 @@ class PlayField {
     this.bag = new Bag();
     this.ghost = {};
 
+    this.held;
+
     this.pf.addEventListener('keyup', (event) => {
       this.btnPressed[event.code] = false;
     });
@@ -168,6 +173,9 @@ class PlayField {
   }
 
   init() {
+    // Create the game interface
+    this.createGameEnvironment();
+
     this.blocks = [];
     this.cntrlPiece = {};
     this.width = 10;
@@ -176,12 +184,38 @@ class PlayField {
       this.blocks[i] = DEFAULT_BGCL;
     }
     this.ctx = this.pf.getContext("2d");
+    this.ctx2 = this.pw.getContext("2d");
     this.blkWidth = this.pf.width / this.width;
     this.blkHeight = this.pf.height / this.height;
   } 
 
+  createGameEnvironment() {
+    this.UIWindow = document.createElement("div");
+    this.UIWindow.className = "play-window";
+
+    this.pf = document.createElement("canvas");
+    this.pf.width = 450;
+    this.pf.height = 900;
+    this.pf.tabIndex = -1;
+    this.pf.className = "play-field";
+
+    this.pw = document.createElement("canvas");
+    this.pw.width = 250;
+    this.pw.height = 250;
+    this.pw.className = "preview-window";
+
+    this.UIWindow.appendChild(this.pf);
+    this.UIWindow.appendChild(this.pw);
+
+    const gameBoardWindow = document.getElementById("game-boards");
+    gameBoardWindow.appendChild(this.UIWindow);
+  }
+
   spawn() {
     let next = this.bag.next();
+    const preview = this.bag.preview();
+    this.preview = new Tetrimino(0, 0, preview, 0, TETR_CLRS[preview]);
+    console.log(this.preview);
     var tetrimino = new Tetrimino(5, 1, next, 0, TETR_CLRS[next]);
     this.ghost = tetrimino.getGhost();
     this.cntrlPiece = tetrimino;
@@ -241,21 +275,21 @@ class PlayField {
     var travelDir = -1;
     var rot = -1;
 
-    if (this.registerKey("KeyA", 5)) {
+    if (this.registerKey("KeyA", 10)) {
       this.cntrlPiece.x--;
       travelDir = 0;
-    } else if (this.registerKey("KeyD", 5)) {
+    } else if (this.registerKey("KeyD", 10)) {
       this.cntrlPiece.x++;
       travelDir = 2;
     } else if (this.registerKey("KeyS")) {
       this.cntrlPiece.y++;
       this.adjustCntrlPiece();
-      this.checkPlacement(3);
+      this.checkPlacement();
       return;
-    } else if (this.registerKey("Period") && this.cntrlPiece.type != TETR_O) {
+    } else if (this.registerKey("Period", 25) && this.cntrlPiece.type != TETR_O) {
       this.cntrlPiece.ccRotate();
       rot = 0;
-    } else if (this.registerKey("Comma") && this.cntrlPiece.type != TETR_O) {
+    } else if (this.registerKey("Comma", 25) && this.cntrlPiece.type != TETR_O) {
       this.cntrlPiece.cRotate();
       rot = 0;
     } else if (this.registerKey("Space", 55)) {
@@ -344,9 +378,11 @@ class PlayField {
       let x = tet[i][0];
       let y = tet[i][1];
       if (tet[i][1] == this.height - 1 || this.isBlock(x, y + 1)) {
-        if (this.dropTimeCounter >= this.dropTime || travelDir == 3) {
+        if (this.dropTimeCounter >= this.dropTime) {
           this.placePiece();
           this.dropTimeCounter = 0;
+        } else if (travelDir == 3) {
+          this.dropTimeCounter += 0.5;
         }
         else this.dropTimeCounter++;
         return;
@@ -416,6 +452,21 @@ class PlayField {
         this.ctx.stroke();
       }   
 
+      this.ctx2.fillStyle = "#F0F0F0";
+      this.ctx2.fillRect(0, 0, this.pw.width, this.pw.height);
+
+      tet = this.preview.getLocations();
+      for (var i = 0; i < tet.length; i++) {
+        this.ctx2.fillStyle = TETR_CLRS[this.preview.type];
+        this.ctx2.fillRect(tet[i][0] * this.blkWidth + (this.pw.width / 2) - (this.blkWidth / 2), tet[i][1] * this.blkHeight + (this.pw.height / 2) - this.blkHeight, this.blkWidth, this.blkHeight);
+        this.ctx2.beginPath();
+        this.ctx2.rect(tet[i][0] * this.blkWidth + (this.pw.width / 2) - (this.blkWidth / 2), tet[i][1] * this.blkHeight + (this.pw.height / 2) - this.blkHeight, this.blkWidth, this.blkHeight);
+        this.ctx2.stroke();
+      }
+
+      this.ctx2.beginPath();
+      this.ctx2.rect(0, 0, this.pw.width, this.pw.height);
+      this.ctx2.stroke();
     }
 
   }
