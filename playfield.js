@@ -23,6 +23,62 @@ const CROT = [0, 1, -1, 0];
 
 const DEFAULT_BGCL = "#F0F0F0";
 
+class PreviewWindow {
+  constructor(width, height, blkWidth, blkHeight) {
+    this.canvas = document.createElement("canvas");
+    this.canvas.className = "preview-window";
+    this.canvas.style.width = width + "px";
+    this.canvas.style.height = height + "px";
+    this.canvas.width = width;
+    this.canvas.height = height;
+
+    this.blkWidth = blkWidth;
+    this.blkHeight = blkHeight;
+
+    this.ctx = this.canvas.getContext("2d");    
+    this.piece; // Piece represented as a Tetrimino object
+  }
+
+  setPiece(piece) {
+    this.piece = piece;
+  }
+
+  setBlkWidth(blkWidth) {
+    this.blkWidth = blkWidth;
+  }
+
+  setBlkHeight(blkHeight) {
+    this.blkHeight = blkHeight;
+  }
+
+  getCanvas() {
+    return this.canvas;
+  }
+
+  draw() {
+    this.ctx.fillStyle = "#F0F0F0";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    if (this.piece) {
+      if ('blocks' in this.piece) {
+        const tet = this.piece.getLocations();
+        for (var i = 0; i < tet.length; i++) {
+          this.ctx.fillStyle = TETR_CLRS[this.piece.type];
+          this.ctx.fillRect(tet[i][0] * this.blkWidth + (this.canvas.width / 2) - (this.blkWidth / 2), tet[i][1] * this.blkHeight + (this.canvas.height / 2) - this.blkHeight, this.blkWidth, this.blkHeight);
+          this.ctx.beginPath();
+          this.ctx.rect(tet[i][0] * this.blkWidth + (this.canvas.width / 2) - (this.blkWidth / 2), tet[i][1] * this.blkHeight + (this.canvas.height / 2) - this.blkHeight, this.blkWidth, this.blkHeight);
+          this.ctx.stroke();
+        }
+      }
+    }
+
+    this.ctx.beginPath();
+    this.ctx.rect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.stroke();
+  }
+
+}
+
 class Bag {
   constructor() {
     this.bag = [];
@@ -161,7 +217,13 @@ class PlayField {
     this.bag = new Bag();
     this.ghost = {};
 
-    this.held;
+    this.held = -1;
+
+    this.nextPiecePreview.setBlkWidth(this.blkWidth);
+    this.nextPiecePreview.setBlkHeight(this.blkHeight);
+
+    this.heldPiecePreview.setBlkWidth(this.blkWidth);
+    this.heldPiecePreview.setBlkHeight(this.blkHeight);
 
     this.pf.addEventListener('keyup', (event) => {
       this.btnPressed[event.code] = false;
@@ -184,7 +246,6 @@ class PlayField {
       this.blocks[i] = DEFAULT_BGCL;
     }
     this.ctx = this.pf.getContext("2d");
-    this.ctx2 = this.pw.getContext("2d");
     this.blkWidth = this.pf.width / this.width;
     this.blkHeight = this.pf.height / this.height;
   } 
@@ -206,16 +267,19 @@ class PlayField {
     this.pf.className = "play-field";
 
     // Configuring the tetrimino preview window
-    this.pw = document.createElement("canvas");
     var pwSize = width / 2;
-    this.pw.style.width = pwSize + "px";
-    this.pw.style.height = pwSize + "px";
-    this.pw.width = pwSize;
-    this.pw.height = pwSize;
-    this.pw.className = "preview-window";
+    this.nextPiecePreview = new PreviewWindow(pwSize, pwSize);
+
+    // Configuring the tetrimino holding window
+    this.heldPiecePreview = new PreviewWindow(pwSize, pwSize);
+
+    this.previewsWindow = document.createElement("div");
+    this.previewsWindow.id = "piecePreviews";
 
     this.UIWindow.appendChild(this.pf);
-    this.UIWindow.appendChild(this.pw);
+    this.UIWindow.appendChild(this.previewsWindow);
+    this.previewsWindow.appendChild(this.nextPiecePreview.getCanvas());
+    this.previewsWindow.appendChild(this.heldPiecePreview.getCanvas());
 
     const gameBoardWindow = document.getElementById("game-boards");
     gameBoardWindow.appendChild(this.UIWindow);
@@ -224,8 +288,7 @@ class PlayField {
   spawn() {
     let next = this.bag.next();
     const preview = this.bag.preview();
-    this.preview = new Tetrimino(0, 0, preview, 0, TETR_CLRS[preview]);
-    console.log(this.preview);
+    this.nextPiecePreview.setPiece(new Tetrimino(0, 0, preview, 0, TETR_CLRS[preview]));
     var tetrimino = new Tetrimino(5, 1, next, 0, TETR_CLRS[next]);
     this.ghost = tetrimino.getGhost();
     this.cntrlPiece = tetrimino;
@@ -248,6 +311,19 @@ class PlayField {
 
   isBlock(x, y) {
     return (this.blocks[this.coordsToInt(x, y)] != DEFAULT_BGCL); 
+  }
+
+  hold() {
+    if (this.held == -1) {
+      this.held = this.cntrlPiece.type;
+      this.spawn();
+    } else {
+      let heldPiece = this.held;
+      this.held = this.cntrlPiece.type;
+      this.cntrlPiece = new Tetrimino(5, 1, heldPiece, 0, TETR_CLRS[heldPiece]);
+      this.ghost = this.cntrlPiece.getGhost();
+    }
+    this.heldPiecePreview.setPiece(new Tetrimino(0, 0, this.held, 0, TETR_CLRS[this.held]));
   }
 
   adjustCntrlPiece(travelDir, rot) {
@@ -305,6 +381,8 @@ class PlayField {
     } else if (this.registerKey("Space", 55)) {
       this.cntrlPiece.y = this.ghost.y;
       this.placePiece();
+    } else if (this.registerKey("ShiftLeft", 55)) {
+      this.hold();
     }
 
     this.adjustCntrlPiece(travelDir, rot);
@@ -434,6 +512,9 @@ class PlayField {
     this.ctx.beginPath();
     this.ctx.rect(0, 0, this.pf.width, this.pf.height);
     this.ctx.stroke();
+
+    this.nextPiecePreview.draw();
+    this.heldPiecePreview.draw();
   
     if ('blocks' in this.cntrlPiece) {
 
@@ -460,23 +541,9 @@ class PlayField {
         this.ctx.beginPath();
         this.ctx.rect(tet[i][0] * this.blkWidth, tet[i][1] * this.blkHeight, this.blkWidth, this.blkHeight);
         this.ctx.stroke();
-      }   
-
-      this.ctx2.fillStyle = "#F0F0F0";
-      this.ctx2.fillRect(0, 0, this.pw.width, this.pw.height);
-
-      tet = this.preview.getLocations();
-      for (var i = 0; i < tet.length; i++) {
-        this.ctx2.fillStyle = TETR_CLRS[this.preview.type];
-        this.ctx2.fillRect(tet[i][0] * this.blkWidth + (this.pw.width / 2) - (this.blkWidth / 2), tet[i][1] * this.blkHeight + (this.pw.height / 2) - this.blkHeight, this.blkWidth, this.blkHeight);
-        this.ctx2.beginPath();
-        this.ctx2.rect(tet[i][0] * this.blkWidth + (this.pw.width / 2) - (this.blkWidth / 2), tet[i][1] * this.blkHeight + (this.pw.height / 2) - this.blkHeight, this.blkWidth, this.blkHeight);
-        this.ctx2.stroke();
       }
 
-      this.ctx2.beginPath();
-      this.ctx2.rect(0, 0, this.pw.width, this.pw.height);
-      this.ctx2.stroke();
+
     }
 
   }

@@ -20,6 +20,15 @@ body {
 }
 
 .preview-window {
+  display: block;
+  margin-bottom: 25px;
+}
+
+#piecePreviews {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
   margin-left: 25px;
 }
 
