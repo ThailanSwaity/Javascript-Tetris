@@ -1,4 +1,4 @@
-const playfield1 = new PlayField("playfield");
+const playfield1 = new PlayField("playfield", 350, 700);
 
 playfield1.spawn();
 

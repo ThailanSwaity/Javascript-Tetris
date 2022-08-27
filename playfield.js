@@ -137,7 +137,7 @@ class Tetrimino {
 }
 
 class PlayField {
-  constructor(id) {
+  constructor(id, width, height) {
     this.id = id;
 
     // Controls game speed
@@ -151,7 +151,7 @@ class PlayField {
     this.dropTime = 2;
     this.dropTimeCounter = 0;
 
-    this.init();
+    this.init(width, height);
 
     this.btnPressed = [];
     this.btnPressTimer = [];
@@ -172,9 +172,9 @@ class PlayField {
     });
   }
 
-  init() {
+  init(width, height) {
     // Create the game interface
-    this.createGameEnvironment();
+    this.createGameEnvironment(width, height);
 
     this.blocks = [];
     this.cntrlPiece = {};
@@ -189,19 +189,29 @@ class PlayField {
     this.blkHeight = this.pf.height / this.height;
   } 
 
-  createGameEnvironment() {
+  /*
+    Creates and adds the game's DOM elements to the element with the "game-board" id
+  */
+  createGameEnvironment(width, height) {
     this.UIWindow = document.createElement("div");
     this.UIWindow.className = "play-window";
 
+    // Configuring the info for the game canvas
     this.pf = document.createElement("canvas");
-    this.pf.width = 450;
-    this.pf.height = 900;
+    this.pf.style.width = width + "px";
+    this.pf.style.height = height + "px";
+    this.pf.width = width;
+    this.pf.height = height;
     this.pf.tabIndex = -1;
     this.pf.className = "play-field";
 
+    // Configuring the tetrimino preview window
     this.pw = document.createElement("canvas");
-    this.pw.width = 250;
-    this.pw.height = 250;
+    var pwSize = width / 2;
+    this.pw.style.width = pwSize + "px";
+    this.pw.style.height = pwSize + "px";
+    this.pw.width = pwSize;
+    this.pw.height = pwSize;
     this.pw.className = "preview-window";
 
     this.UIWindow.appendChild(this.pf);
